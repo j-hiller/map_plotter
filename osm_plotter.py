@@ -4,6 +4,8 @@ import requests
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from shutil import which
 
 import osm_helpers
 
@@ -100,6 +102,16 @@ def combine_supertile(x_tile_min: int, x_tile_max: int,
     return supertile
 
 
+def is_pdflatex_available() -> bool:
+    """
+    Method that simply checks if pdflatex is available on the system.
+
+    Returns:
+        bool: pdflatex is available
+    """
+    return which('pdflatex') is not None
+
+
 def main(args) -> None:
     fig_folder = Path('./figs')
     fig_folder.mkdir(exist_ok=True, parents=True)
@@ -127,6 +139,34 @@ def main(args) -> None:
     lat_min, lon_min = osm_helpers.num2deg(x_tile_min, y_tile_max + 1, zoom_level)
     lat_max, lon_max = osm_helpers.num2deg(x_tile_max + 1, y_tile_min, zoom_level)
 
+    plt.rcParams.update({
+        'font.family': 'sans-serif',
+        'font.sans-serif': 'Arial',
+        'font.size': 11,
+        'figure.figsize': (6.2, 4.65),
+        'axes.titlesize': 'medium',
+        'figure.titlesize': 'medium',
+    })
+
+    if is_pdflatex_available():
+        # https://matplotlib.org/stable/tutorials/text/pgf.html
+        plt.rcParams.update({
+            'text.usetex': True,
+            'text.latex.preamble': '\n'.join([r'\usepackage{amsmath}',
+                                              r'\usepackage{amssymb}',
+                                              r'\usepackage{siunitx}[=v2]']),
+            'pgf.texsystem': 'pdflatex',
+            "pgf.preamble": "\n".join([
+                r'\usepackage[utf8]{inputenc}',
+                r'\usepackage[T1]{fontenc}',
+                r'\usepackage[scaled=1]{uarial}',
+                r'\usepackage{cmbright}',
+                ]),
+        })
+        fig_suffix = 'pgf'
+    else:
+        fig_suffix = 'png'
+
     ms = 2
 
     fig, ax = plt.subplots()
@@ -145,14 +185,19 @@ def main(args) -> None:
         if int(hway) in map_data['ways']:
             ax.plot(map_data['ways'][int(hway)]['geojson']['coordinates'][hway_v][0],
                     map_data['ways'][int(hway)]['geojson']['coordinates'][hway_v][1],
-                    color='yellow', marker='o', markersize=ms/2)
+                    color='black', marker='d', markersize=ms)
     for node, node_v in map_data['nodes'].items():
         ax.plot(node_v['geojson']['coordinates'][0],
                    node_v['geojson']['coordinates'][1],
-                   color='yellow', marker='o', markersize=ms/2)
+                   color='yellow', marker='d', markersize=ms)
     ax.set_axis_off()
+    ax.legend([Line2D([0], [0], color='w', markerfacecolor='b', marker='o'),
+               Line2D([0], [0], color='w', markerfacecolor='green', marker='o'),
+               Line2D([0], [0], color='w', markerfacecolor='black', marker='d')],
+              ['motorway', 'motorway\_link', 'connecting node'])
     plt.tight_layout()
-    fig.savefig(fig_folder.joinpath(args.json.stem + '.svg'), dpi=300)
+    fig.savefig(fig_folder.joinpath(args.json.stem + '.' + fig_suffix),
+                dpi=300, bbox_inches='tight')
     
     return None
 
